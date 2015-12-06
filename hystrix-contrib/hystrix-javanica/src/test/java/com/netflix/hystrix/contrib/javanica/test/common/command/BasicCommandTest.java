@@ -4,6 +4,7 @@ package com.netflix.hystrix.contrib.javanica.test.common.command;
 import com.netflix.hystrix.HystrixEventType;
 import com.netflix.hystrix.HystrixInvokableInfo;
 import com.netflix.hystrix.HystrixRequestLog;
+import com.netflix.hystrix.contrib.javanica.annotation.CommandKey;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.netflix.hystrix.contrib.javanica.command.AsyncResult;
 import com.netflix.hystrix.contrib.javanica.test.common.BasicHystrixTest;
@@ -52,6 +53,13 @@ public abstract class BasicCommandTest extends BasicHystrixTest {
     public void testGetUserSync() {
         User u1 = userService.getUserSync("1", "name: ");
         assertGetUserSnycCommandExecuted(u1);
+    }
+
+    @Test
+    public void testGetUserSyncWithAnnotatedCommandKeyParameter() {
+        User u1 = userService.getUserSyncWithAnnotatedCommandKeyParameter("commandKeyParameter", "name: ");
+        com.netflix.hystrix.HystrixInvokableInfo<?> command = getCommand();
+        assertEquals("commandKeyParameter", command.getCommandKey().name());
     }
 
     @Test
@@ -151,6 +159,11 @@ public abstract class BasicCommandTest extends BasicHystrixTest {
 
         @HystrixCommand(groupKey = "UserGroup")
         public User getUserSync(String id, String name) {
+            return new User(id, name + id); // it should be network call
+        }
+
+        @HystrixCommand(groupKey = "UserGroup")
+        public User getUserSyncWithAnnotatedCommandKeyParameter(@CommandKey String id, String name) {
             return new User(id, name + id); // it should be network call
         }
 

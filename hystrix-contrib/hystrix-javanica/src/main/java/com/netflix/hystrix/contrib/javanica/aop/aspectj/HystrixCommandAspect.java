@@ -17,10 +17,10 @@ package com.netflix.hystrix.contrib.javanica.aop.aspectj;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
-import com.netflix.hystrix.HystrixExecutable;
 import com.netflix.hystrix.HystrixInvokable;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCollapser;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.CommandKey;
 import com.netflix.hystrix.contrib.javanica.command.CommandExecutor;
 import com.netflix.hystrix.contrib.javanica.command.ExecutionType;
 import com.netflix.hystrix.contrib.javanica.command.HystrixCommandFactory;
@@ -36,6 +36,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -104,6 +105,20 @@ public class HystrixCommandAspect {
             Object[] args = joinPoint.getArgs();
             Object proxy = joinPoint.getThis();
             return create(proxy, method, obj, args, joinPoint);
+        }
+
+        public String getCommandKey(ProceedingJoinPoint joinPoint, Method method) {
+            Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+            int positionOfAnnotatedParameter = 0;
+            for (Annotation[] annotationArray : parameterAnnotations) {
+                for (Annotation annotation : annotationArray) {
+                    if (annotation instanceof CommandKey) {
+                        return String.valueOf(joinPoint.getArgs()[positionOfAnnotatedParameter]);
+                    }
+                }
+                positionOfAnnotatedParameter++;
+            }
+            return null;
         }
 
         public abstract MetaHolder create(Object proxy, Method method, Object obj, Object[] args, final ProceedingJoinPoint joinPoint);
@@ -206,7 +221,11 @@ public class HystrixCommandAspect {
             HystrixCommand hystrixCommand = method.getAnnotation(HystrixCommand.class);
             ExecutionType executionType = ExecutionType.getExecutionType(method.getReturnType());
             MetaHolder.Builder builder = metaHolderBuilder(proxy, method, obj, args, joinPoint);
-            return builder.defaultCommandKey(method.getName())
+            String commandKey = getCommandKey(joinPoint, method);
+            if (commandKey == null) {
+                commandKey = method.getName();
+            }
+            return builder.defaultCommandKey(commandKey)
                             .hystrixCommand(hystrixCommand)
                             .observableExecutionMode(hystrixCommand.observableExecutionMode())
                             .executionType(executionType)
